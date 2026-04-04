@@ -1,0 +1,37 @@
+services:
+  devcontainer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: full  # Change to "base" if you don't need ffmpeg/imagemagick
+    volumes:
+      - .:/workspace:cached
+      - .devcontainer.config.toml:/workspace/.devcontainer.config.toml:ro
+      # Shared socket volumes for DB connections (no TCP ports needed)
+      - mysql-socket:/var/run/mysqld
+      - postgresql-socket:/var/run/postgresql
+
+  # ── Optional: MySQL sidecar (uncomment to use) ──────────
+  # mysql:
+  #   image: mysql:8
+  #   volumes:
+  #     - mysql-socket:/var/run/mysqld
+  #     - mysql-data:/var/lib/mysql
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: devpassword
+  #   command: --socket=/var/run/mysqld/mysqld.sock
+
+  # ── Optional: PostgreSQL sidecar (uncomment to use) ─────
+  # postgres:
+  #   image: postgres:16
+  #   volumes:
+  #     - postgresql-socket:/var/run/postgresql
+  #     - postgres-data:/var/lib/postgresql/data
+  #   environment:
+  #     POSTGRES_PASSWORD: devpassword
+
+volumes:
+  mysql-socket:
+  postgresql-socket:
+  # mysql-data:
+  # postgres-data:
