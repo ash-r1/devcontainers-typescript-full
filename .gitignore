@@ -1,5 +1,5 @@
 # Secrets
-.devcontainer.config.toml
+.devcontainer/config.toml
 
 # macOS
 .DS_Store

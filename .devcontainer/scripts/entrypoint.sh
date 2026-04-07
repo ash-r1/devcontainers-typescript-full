@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-CONFIG_FILE="${DEVCONTAINER_CONFIG:-/workspace/.devcontainer.config.toml}"
+CONFIG_FILE="${DEVCONTAINER_CONFIG:-/workspace/.devcontainer/config.toml}"
 ENV_FILE="/etc/profile.d/devcontainer-env.sh"
 
 # ── Helper: read a TOML value (returns empty string if missing) ──
@@ -107,7 +107,7 @@ if [ -f "$CONFIG_FILE" ]; then
 
 else
     echo "[devcontainer] No config file found at $CONFIG_FILE — skipping configuration"
-    echo "[devcontainer] Create one from example.devcontainer.config.toml to enable auto-configuration"
+    echo "[devcontainer] Create one from example.config.toml to enable auto-configuration"
 fi
 
 exec "$@"

@@ -1,6 +1,6 @@
 # devcontainer configuration
-# Copy this file to .devcontainer.config.toml in your project root.
-# IMPORTANT: Add .devcontainer.config.toml to your .gitignore (contains secrets).
+# Copy this file to config.toml in this directory.
+# IMPORTANT: Add .devcontainer/config.toml to your .gitignore (contains secrets).
 
 # ── Required ─────────────────────────────────────────────
 [git]

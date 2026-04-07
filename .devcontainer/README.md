@@ -7,7 +7,7 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
 
 - **ベースイメージ**: `mcr.microsoft.com/devcontainers/typescript-node:latest`
 - **マルチステージビルド**: `base`（コア開発ツール）と `full`（+ ffmpeg / imagemagick）を `docker-compose.yml` の `target` で切替
-- **TOML 一元管理**: `.devcontainer.config.toml` に Git / API キー / DB ソケット等の設定を集約し、entrypoint で自動適用
+- **TOML 一元管理**: `.devcontainer/config.toml` に Git / API キー / DB ソケット等の設定を集約し、entrypoint で自動適用
 - **DB サイドカー**: MySQL・PostgreSQL を Unix ソケット経由で接続（docker-compose.yml 内にコメントアウトで用意）
 
 ## 含まれるツール
@@ -28,10 +28,10 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
 1. 設定ファイルを作成:
 
    ```bash
-   cp example.devcontainer.config.toml .devcontainer.config.toml
+   cp example.config.toml config.toml
    ```
 
-2. `.devcontainer.config.toml` を編集し、Git の名前・メールアドレス（必須）と各種 API キーを設定
+2. `config.toml` を編集し、Git の名前・メールアドレス（必須）と各種 API キーを設定
 
 3. VS Code で「Dev Containers: Reopen in Container」を実行
 
@@ -42,12 +42,12 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
   devcontainer.json                 # VS Code devcontainer 設定
   docker-compose.yml                # サービス定義（devcontainer + オプションの DB サイドカー）
   Dockerfile                        # マルチステージビルド（base / full）
-  example.devcontainer.config.toml  # 設定テンプレート（コピーして使用）
+  example.config.toml               # 設定テンプレート（コピーして使用）
   scripts/
     entrypoint.sh                   # コンテナ起動時に TOML 設定を読み込み環境を構成
 ```
 
-## 設定項目 (.devcontainer.config.toml)
+## 設定項目 (config.toml)
 
 | セクション | 項目 | 必須 | 説明 |
 |-----------|------|------|------|

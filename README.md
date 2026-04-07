@@ -6,8 +6,8 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
 
 1. `.devcontainer/` ディレクトリをプロジェクトにコピー
 2. `.devcontainer/devcontainer.json` の `name` をプロジェクト名に変更
-3. `cp .devcontainer/example.devcontainer.config.toml .devcontainer.config.toml` で設定ファイルを作成し、Git の名前・メールと必要な API キーを記入
-4. `.devcontainer.config.toml` を `.gitignore` に追加
+3. `cp .devcontainer/example.config.toml .devcontainer/config.toml` で設定ファイルを作成し、Git の名前・メールと必要な API キーを記入
+4. `.devcontainer/config.toml` を `.gitignore` に追加
 5. VS Code「Dev Containers: Reopen in Container」または `devcontainer up` で起動
 6. 停止するときは `bin/devcontainer-down` を実行
 
