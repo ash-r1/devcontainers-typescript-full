@@ -1,1 +1,12 @@
+# Secrets
 .devcontainer.config.toml
+
+# macOS
+.DS_Store
+
+# Editor / IDE
+.claude
+.vscode
+
+# Node
+node_modules
