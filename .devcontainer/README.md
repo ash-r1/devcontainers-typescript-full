@@ -71,6 +71,9 @@ npm install -g @devcontainers/cli
 # コンテナの起動
 devcontainer up
 
+# コンテナの停止
+bin/devcontainer-down
+
 # コマンド実行
 devcontainer exec node --version
 devcontainer exec bash

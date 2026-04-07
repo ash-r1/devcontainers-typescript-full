@@ -1,0 +1,26 @@
+#!/bin/bash
+set -euo pipefail
+
+# devcontainerを停止するスクリプト
+# devcontainerは起動時に独自のプロジェクト名と一時的なoverride composeファイルを使うため、
+# 単純な `docker compose -f <file> down` では停止できない。
+# `devcontainer up --expect-existing-container` でプロジェクト名を取得して停止する。
+
+WORKSPACE_FOLDER="${1:-.}"
+
+# 実行中のdevcontainerからcompose project nameを取得
+# --expect-existing-container: コンテナが存在しなければエラーになるだけで、新規起動はしない
+RESULT=$(devcontainer up --workspace-folder "$WORKSPACE_FOLDER" --expect-existing-container 2>/dev/null) || {
+  echo "Error: ${WORKSPACE_FOLDER} に実行中のdevcontainerが見つかりません" >&2
+  exit 1
+}
+
+PROJECT_NAME=$(echo "$RESULT" | jq -r '.composeProjectName // empty')
+
+if [ -z "$PROJECT_NAME" ]; then
+  echo "Error: composeProjectName を取得できませんでした" >&2
+  exit 1
+fi
+
+echo "Stopping devcontainer: project=${PROJECT_NAME}"
+docker compose -p "$PROJECT_NAME" down
