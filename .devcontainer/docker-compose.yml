@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
       target: full  # Change to "base" if you don't need ffmpeg/imagemagick
     volumes:
-      - .:/workspace:cached
-      - .devcontainer.config.toml:/workspace/.devcontainer.config.toml:ro
+      - ..:/workspace:cached
+      - ../.devcontainer.config.toml:/workspace/.devcontainer.config.toml:ro
       # Shared socket volumes for DB connections (no TCP ports needed)
       - mysql-socket:/var/run/mysqld
       - postgresql-socket:/var/run/postgresql

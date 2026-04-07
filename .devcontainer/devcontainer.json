@@ -1,6 +1,6 @@
 {
   "name": "TypeScript Full Stack",
-  "dockerComposeFile": "../docker-compose.yml",
+  "dockerComposeFile": "docker-compose.yml",
   "service": "devcontainer",
   "workspaceFolder": "/workspace",
   "remoteUser": "node",
