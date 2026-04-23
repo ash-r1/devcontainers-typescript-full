@@ -37,20 +37,26 @@ RUN ARCH=$(dpkg --print-architecture) \
     && curl -fsSL "https://github.com/TomWright/dasel/releases/latest/download/dasel_linux_${ARCH}" -o /usr/local/bin/dasel \
     && chmod +x /usr/local/bin/dasel
 
-# Claude Code — native installer (latest). Binary goes to ~/.local/bin/claude.
-# Codex CLI — latest via npm.
-# Pre-create ~/.claude and ~/.codex so named volume mounts inherit node ownership,
-# and symlink ~/.claude.json into ~/.claude/ so that file is persisted too.
+# Claude Code — native installer (latest). The installer uses bash syntax,
+# so we pipe to `bash` (not `sh`/dash). It lays the binary down at
+# ~/.claude/local/bin/claude, which is inside the volume-mounted path at
+# runtime, so copy it to /usr/local/bin/claude to keep it outside the
+# persisted volume and to ensure image rebuilds actually pick up the newer
+# version.
 RUN su node -c "curl -fsSL https://claude.ai/install.sh | bash" \
-    && test -x /home/node/.local/bin/claude \
-    && su node -c "npm install -g @openai/codex@latest" \
-    && su node -c "npm cache clean --force" \
-    && su node -c "mkdir -p /home/node/.claude /home/node/.codex" \
+    && cp /home/node/.claude/local/bin/claude /usr/local/bin/claude \
+    && chmod +x /usr/local/bin/claude
+
+# Codex CLI — latest via npm.
+RUN su node -c "npm install -g @openai/codex@latest" \
+    && su node -c "npm cache clean --force"
+
+# Pre-create persisted config dirs with node ownership so named volume
+# mounts start empty but writable. ~/.claude.json is symlinked into
+# ~/.claude/ so that file is persisted alongside the rest of the state.
+RUN su node -c "mkdir -p /home/node/.claude /home/node/.codex" \
     && su node -c "touch /home/node/.claude/_claude.json" \
     && su node -c "ln -sf /home/node/.claude/_claude.json /home/node/.claude.json"
-
-# Ensure the native claude binary is on PATH for login and non-login shells.
-ENV PATH=/home/node/.local/bin:$PATH
 
 # Socket directories for DB connections
 RUN mkdir -p /var/run/mysqld /var/run/postgresql \
