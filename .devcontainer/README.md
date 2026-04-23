@@ -17,8 +17,8 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
 | GitHub CLI (`gh`) | GitHub 操作 |
 | AWS CLI v2 | AWS リソース操作 |
 | dasel | TOML パーサ（entrypoint 用） |
-| Claude Code CLI | Anthropic AI コーディングアシスタント |
-| OpenAI Codex CLI | OpenAI コーディングアシスタント |
+| Claude Code CLI | Anthropic AI コーディングアシスタント（native installer で最新版） |
+| OpenAI Codex CLI | OpenAI コーディングアシスタント（npm で最新版） |
 | mysql-client / psql | DB クライアント |
 | redis-tools | Redis クライアント |
 | ffmpeg / imagemagick | メディア処理（`full` ステージのみ） |
@@ -81,6 +81,21 @@ devcontainer exec claude
 
 # ビルドのみ
 devcontainer build
+```
+
+## Claude / Codex の設定永続化
+
+リビルドで設定が飛ばないよう、以下のパスを Docker の名前付きボリュームに永続化しています（`docker-compose.yml` で定義）。
+
+| ボリューム | マウント先 | 用途 |
+|-----------|-----------|------|
+| `claude-config` | `/home/node/.claude` | Claude Code の `settings.json` / `.credentials.json` / `projects/` 等。`~/.claude.json` もこのボリューム配下にシンボリックリンクされます |
+| `codex-config` | `/home/node/.codex` | Codex CLI の設定・認証情報 |
+
+Claude Code は native installer でインストールされるため、バイナリ自身が起動時にバックグラウンドで自動更新されます。ボリュームを破棄してゼロから設定し直したい場合:
+
+```bash
+docker volume rm <プロジェクト名>_claude-config <プロジェクト名>_codex-config
 ```
 
 ## DB サイドカーの有効化

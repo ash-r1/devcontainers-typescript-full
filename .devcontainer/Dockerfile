@@ -37,9 +37,20 @@ RUN ARCH=$(dpkg --print-architecture) \
     && curl -fsSL "https://github.com/TomWright/dasel/releases/latest/download/dasel_linux_${ARCH}" -o /usr/local/bin/dasel \
     && chmod +x /usr/local/bin/dasel
 
-# Global npm packages: Claude Code & Codex CLI
-RUN su node -c "npm install -g @anthropic-ai/claude-code @openai/codex" \
-    && su node -c "npm cache clean --force"
+# Claude Code — native installer (latest). Binary goes to ~/.local/bin/claude.
+# Codex CLI — latest via npm.
+# Pre-create ~/.claude and ~/.codex so named volume mounts inherit node ownership,
+# and symlink ~/.claude.json into ~/.claude/ so that file is persisted too.
+RUN su node -c "curl -fsSL https://claude.ai/install.sh | bash" \
+    && test -x /home/node/.local/bin/claude \
+    && su node -c "npm install -g @openai/codex@latest" \
+    && su node -c "npm cache clean --force" \
+    && su node -c "mkdir -p /home/node/.claude /home/node/.codex" \
+    && su node -c "touch /home/node/.claude/_claude.json" \
+    && su node -c "ln -sf /home/node/.claude/_claude.json /home/node/.claude.json"
+
+# Ensure the native claude binary is on PATH for login and non-login shells.
+ENV PATH=/home/node/.local/bin:$PATH
 
 # Socket directories for DB connections
 RUN mkdir -p /var/run/mysqld /var/run/postgresql \

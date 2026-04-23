@@ -4,6 +4,16 @@ set -euo pipefail
 CONFIG_FILE="${DEVCONTAINER_CONFIG:-/workspace/.devcontainer/config.toml}"
 ENV_FILE="/etc/profile.d/devcontainer-env.sh"
 
+# ── Ensure persisted config volumes are owned by node ──
+# Named volumes for ~/.claude and ~/.codex start root-owned on first mount
+# (unless pre-populated from the image). Re-home them so the node user can
+# write settings, credentials, and cache files inside the container.
+if [ "$(id -u)" = "0" ]; then
+    for d in /home/node/.claude /home/node/.codex; do
+        [ -d "$d" ] && chown -R node:node "$d" 2>/dev/null || true
+    done
+fi
+
 # ── Helper: read a TOML value (returns empty string if missing) ──
 toml_get() {
     local result

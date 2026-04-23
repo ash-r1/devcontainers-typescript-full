@@ -10,6 +10,9 @@ services:
       # Shared socket volumes for DB connections (no TCP ports needed)
       - mysql-socket:/var/run/mysqld
       - postgresql-socket:/var/run/postgresql
+      # Persist Claude Code / Codex CLI settings across rebuilds
+      - claude-config:/home/node/.claude
+      - codex-config:/home/node/.codex
 
   # ── Optional: MySQL sidecar (uncomment to use) ──────────
   # mysql:
@@ -33,5 +36,7 @@ services:
 volumes:
   mysql-socket:
   postgresql-socket:
+  claude-config:
+  codex-config:
   # mysql-data:
   # postgres-data:
