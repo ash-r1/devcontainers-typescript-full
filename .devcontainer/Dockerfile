@@ -3,6 +3,9 @@
 # ═══════════════════════════════════════════════════════════
 FROM mcr.microsoft.com/devcontainers/typescript-node:latest AS base
 
+ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
+ENV PATH=/home/node/.npm-global/bin:${PATH}
+
 # System packages: DB clients, redis, utilities
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -37,9 +40,9 @@ RUN ARCH=$(dpkg --print-architecture) \
     && curl -fsSL "https://github.com/TomWright/dasel/releases/latest/download/dasel_linux_${ARCH}" -o /usr/local/bin/dasel \
     && chmod +x /usr/local/bin/dasel
 
-# Global npm packages: Claude Code & Codex CLI
-RUN su node -c "npm install -g @anthropic-ai/claude-code @openai/codex" \
-    && su node -c "npm cache clean --force"
+# Writable global npm prefix for self-updating CLIs
+RUN mkdir -p /home/node/.npm-global \
+    && chown -R node:node /home/node/.npm-global
 
 # Socket directories for DB connections
 RUN mkdir -p /var/run/mysqld /var/run/postgresql \

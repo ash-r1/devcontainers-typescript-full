@@ -3,11 +3,14 @@
 TypeScript フルスタック開発用の汎用 devcontainer テンプレート。
 このディレクトリをプロジェクトにコピーし、`devcontainer.json` の `name` を書き換えるだけで使えます。
 
+設計意図や永続化・自己更新まわりの判断理由は `design.md` を参照してください。
+
 ## 特徴
 
 - **ベースイメージ**: `mcr.microsoft.com/devcontainers/typescript-node:latest`
 - **マルチステージビルド**: `base`（コア開発ツール）と `full`（+ ffmpeg / imagemagick）を `docker-compose.yml` の `target` で切替
 - **TOML 一元管理**: `.devcontainer/config.toml` に Git / API キー / DB ソケット等の設定を集約し、entrypoint で自動適用
+- **CLI 永続化**: `.devcontainer-data/` を host bind mount し、Codex/Claude/GitHub/AWS の設定・セッション・ログ・npm グローバルパッケージを保持
 - **DB サイドカー**: MySQL・PostgreSQL を Unix ソケット経由で接続（docker-compose.yml 内にコメントアウトで用意）
 
 ## 含まれるツール
@@ -17,8 +20,8 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
 | GitHub CLI (`gh`) | GitHub 操作 |
 | AWS CLI v2 | AWS リソース操作 |
 | dasel | TOML パーサ（entrypoint 用） |
-| Claude Code CLI | Anthropic AI コーディングアシスタント |
-| OpenAI Codex CLI | OpenAI コーディングアシスタント |
+| Claude Code CLI | Anthropic AI コーディングアシスタント（初回起動時に writable な npm prefix へ自動導入） |
+| OpenAI Codex CLI | OpenAI コーディングアシスタント（初回起動時に writable な npm prefix へ自動導入） |
 | mysql-client / psql | DB クライアント |
 | redis-tools | Redis クライアント |
 | ffmpeg / imagemagick | メディア処理（`full` ステージのみ） |
@@ -35,6 +38,8 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
 
 3. VS Code で「Dev Containers: Reopen in Container」を実行
 
+初回起動時に `claude` / `codex` は `/home/node/.npm-global` へ自動インストールされます。自己更新後のバージョンも `.devcontainer-data/npm-global/` に保存されるため、`docker compose down` 後も維持されます。
+
 ## ファイル構成
 
 ```
@@ -45,6 +50,7 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
   example.config.toml               # 設定テンプレート（コピーして使用）
   scripts/
     entrypoint.sh                   # コンテナ起動時に TOML 設定を読み込み環境を構成
+.devcontainer-data/                 # host 側に残る CLI の設定・履歴・ログ・npm グローバル領域
 ```
 
 ## 設定項目 (config.toml)
@@ -78,10 +84,22 @@ bin/devcontainer-down
 devcontainer exec node --version
 devcontainer exec bash
 devcontainer exec claude
+devcontainer exec codex
 
 # ビルドのみ
 devcontainer build
 ```
+
+## 永続化されるデータ
+
+`docker compose down` 後も、以下は host 側の `.devcontainer-data/` に残ります。
+
+- `npm-global/`: `claude` / `codex` 本体。自己更新後のバージョンも保持
+- `codex/`: Codex の設定、セッション、過去ログ
+- `claude/`: Claude Code のユーザー設定、skills、commands、plugins、認証情報
+- `claude-root/`: Claude Code の `~/.claude.json`。OAuth セッション、MCP 設定、許可状態、各種キャッシュ
+- `gh/`: GitHub CLI の認証状態
+- `aws/`: AWS CLI の認証・設定
 
 ## DB サイドカーの有効化
 

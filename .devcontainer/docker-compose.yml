@@ -7,6 +7,12 @@ services:
     volumes:
       - ..:/workspace:cached
       - ./config.toml:/workspace/.devcontainer/config.toml:ro
+      - ../.devcontainer-data/npm-global:/home/node/.npm-global
+      - ../.devcontainer-data/codex:/home/node/.codex
+      - ../.devcontainer-data/claude:/home/node/.claude
+      - ../.devcontainer-data/claude-root:/home/node/.claude-root
+      - ../.devcontainer-data/gh:/home/node/.config/gh
+      - ../.devcontainer-data/aws:/home/node/.aws
       # Shared socket volumes for DB connections (no TCP ports needed)
       - mysql-socket:/var/run/mysqld
       - postgresql-socket:/var/run/postgresql
