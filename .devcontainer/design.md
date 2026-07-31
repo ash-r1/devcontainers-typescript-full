@@ -1,0 +1,156 @@
+# Devcontainer Design Notes
+
+このファイルは `.devcontainer` の設計意図を残すためのメモです。
+README は使い方中心、こちらは判断理由と変更時の注意点をまとめます。
+
+## 目的
+
+この devcontainer は、単に開発ツールを入れたコンテナではなく、以下を両立することを目的にしています。
+
+- VS Code Dev Containers と `devcontainer` CLI の両方で扱いやすいこと
+- Git や API キーなどの初期設定を自動適用できること
+- `docker compose down` 後も、AI CLI の状態や認証が不用意に消えないこと
+- Claude Code / Codex の自己更新や状態保存が、非 root の `node` ユーザーで破綻しないこと
+
+## 前提
+
+この構成では、作業ディレクトリそのものは `..:/workspace` で bind mount しています。
+一方で、CLI の設定・セッション・ログ・認証・自己更新後の実体は、主に `/home/node` 配下に作られます。
+
+ここを永続化しないと、コンテナを作り直した時点で以下が失われます。
+
+- Codex の設定、過去ログ、セッション
+- Claude Code のユーザー設定、認証、許可状態、MCP 設定
+- GitHub CLI / AWS CLI の認証状態
+- `npm install -g` で更新された CLI バイナリ
+
+つまり、`/workspace` だけ bind mount しても、AI CLI の実運用には不十分です。
+
+## 永続化方針
+
+永続化は Docker named volume ではなく、host 側の gitignore 済みディレクトリ `.devcontainer-data/` への bind mount を採用しています。
+
+理由:
+
+- どのデータが残るかをリポジトリ利用者が把握しやすい
+- `docker compose down` や devcontainer の再作成で消えない
+- バックアップや削除を host 側から直接扱える
+- named volume より、状態の所在が見えやすい
+
+現時点の対応表:
+
+- `.devcontainer-data/npm-global` -> `/home/node/.npm-global`
+- `.devcontainer-data/codex` -> `/home/node/.codex`
+- `.devcontainer-data/claude` -> `/home/node/.claude`
+- `.devcontainer-data/claude-root` -> `/home/node/.claude-root`
+- `.devcontainer-data/gh` -> `/home/node/.config/gh`
+- `.devcontainer-data/aws` -> `/home/node/.aws`
+
+## Codex / Claude の自己更新
+
+### 問題
+
+当初は `Dockerfile` の build 時に `npm install -g @anthropic-ai/claude-code @openai/codex` を実行していました。
+この形だと、CLI はイメージ層に入るため、実行時の `node` ユーザーから自己更新しづらくなります。
+
+特に次の問題が起きやすくなります。
+
+- install 先が root 管理領域になり、更新時に権限不足になる
+- 更新できても、コンテナ再作成で build 時点の版に戻る
+- 更新結果がどこに残るのか見えづらい
+
+### 採用した方針
+
+`NPM_CONFIG_PREFIX=/home/node/.npm-global` を使い、CLI 本体を writable なユーザー領域へ置きます。
+このディレクトリは host 側の `.devcontainer-data/npm-global` に bind mount されるため、更新後の CLI 実体も保持されます。
+
+また、`entrypoint.sh` で次を行います。
+
+- `PATH` に `/home/node/.npm-global/bin` を追加
+- 永続化対象ディレクトリを起動時に作成
+- `claude` / `codex` が未導入なら `node` ユーザーで `npm install -g` する
+
+この構成により、初回起動時は自動導入、2 回目以降は永続化済みの実体をそのまま使う、という動作になります。
+
+## Claude 固有の考慮
+
+Claude Code は `~/.claude` だけ見れば十分、ではありません。
+ユーザー設定や skills などは `~/.claude` にありますが、OAuth セッション、MCP 設定、許可状態、各種キャッシュは `~/.claude.json` に保存されます。
+
+そのため、`~/.claude` だけ永続化すると次の半端な状態が起こります。
+
+- settings や skills は残る
+- しかしログイン状態や許可状態が再作成で消える
+
+これを避けるため、`/home/node/.claude.json` 自体を永続化したいのですが、単一ファイル bind mount よりディレクトリ管理の方が扱いやすいため、次の構成にしています。
+
+- `/home/node/.claude-root/.claude.json` を永続化
+- `/home/node/.claude.json` はそのファイルへの symlink とする
+
+この symlink は `entrypoint.sh` で起動時に補います。
+
+## Codex 固有の考慮
+
+Codex の設定、セッション、ログは主に `~/.codex` に保存されます。
+したがって、`/home/node/.codex` をそのまま host 側へ bind mount しています。
+
+この永続化により、少なくとも以下が `docker compose down` 後も保持されます。
+
+- 設定
+- 過去ログ
+- セッション履歴
+- モデル情報などのキャッシュ
+
+## entrypoint の責務
+
+`scripts/entrypoint.sh` は単なる起動ラッパーではなく、現在は以下を担っています。
+
+- `.devcontainer/config.toml` の読み込み
+- Git 設定の適用
+- API キーなどの環境変数の export
+- GitHub CLI 認証
+- AWS CLI 環境変数設定
+- DB ソケット関連環境変数の設定
+- 永続化対象ディレクトリの作成
+- Claude / Codex の導入確認と不足時のインストール
+- Claude の `~/.claude.json` symlink 補完
+
+つまり、`Dockerfile` はベース環境を用意し、実行時に変化する個人設定や CLI 状態は `entrypoint.sh` 側で収束させる、という責務分離です。
+
+## 変更時に守りたいこと
+
+今後この構成を変更する場合は、少なくとも以下を崩さない方がよいです。
+
+- `node` ユーザーで CLI が実行・更新できること
+- 更新後の CLI 実体がコンテナ再作成後も残ること
+- Claude の `~/.claude` と `~/.claude.json` の両方が失われないこと
+- Codex の `~/.codex` が失われないこと
+- `.devcontainer-data/` は git 管理対象にしないこと
+- `config.toml` は読み取り専用 mount のままにすること
+
+## トレードオフ
+
+この構成には意図的なトレードオフがあります。
+
+- 初回起動時は `claude` / `codex` の導入分だけ起動が少し重い
+- host 側に `.devcontainer-data/` が増える
+- CLI のバージョンが image build と完全一致しない場合がある
+
+ただし、これらは次の利点のために受け入れています。
+
+- 自己更新が壊れにくい
+- 再作成で認証や履歴が消えにくい
+- AI CLI を日常運用しやすい
+
+## 既知の注意点
+
+- この設計は `node` ユーザーのホーム配下を状態保存先として使う前提です。ベースイメージや `remoteUser` を変える場合は見直しが必要です。
+- `docker` 自体をこの開発環境から直接叩けない場合、実コンテナでの動作確認は host 側で行う必要があります。
+- Claude / Codex 側の将来の保存先変更があれば、bind mount 対象も追従が必要です。
+
+## 関連ファイル
+
+- `Dockerfile`: ベース環境と writable な npm prefix の定義
+- `docker-compose.yml`: 永続化用 bind mount の定義
+- `scripts/entrypoint.sh`: 実行時初期化と CLI 状態の収束
+- `README.md`: 利用者向けセットアップ手順
