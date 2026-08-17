@@ -51,6 +51,7 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
   example.config.toml               # 設定テンプレート（コピーして使用）
   scripts/
     entrypoint.sh                   # コンテナ起動時に TOML 設定を読み込み環境を構成
+    smoke-test.sh                   # ビルド済みイメージの動作確認（CI から実行）
 .devcontainer-data/                 # host 側に残る CLI の設定・履歴・ログ・npm グローバル領域
 ```
 
@@ -105,6 +106,31 @@ devcontainer build
 ## DB サイドカーの有効化
 
 `docker-compose.yml` 内の MySQL / PostgreSQL セクションのコメントを解除してください。DB には Unix ソケット経由で接続します（TCP ポートのホスト公開不要）。
+
+## 動作確認 (smoke test)
+
+`.github/workflows/devcontainer.yml` が push / PR / 週次で、`base` と `full` の両ターゲットをビルドし、`scripts/smoke-test.sh` を root と node の両ユーザーで実行します。
+
+手元で同じ確認をする場合:
+
+```bash
+docker build --target full -t devcontainer-smoke:full .devcontainer
+
+docker run --rm -e SMOKE_TARGET=full \
+  -v "$PWD/.devcontainer/scripts:/smoke:ro" \
+  --entrypoint bash devcontainer-smoke:full /smoke/smoke-test.sh
+
+# 実作業ユーザーでも同じ結果になること
+docker run --rm --user node -e HOME=/home/node -e SMOKE_TARGET=full \
+  -v "$PWD/.devcontainer/scripts:/smoke:ro" \
+  --entrypoint bash devcontainer-smoke:full /smoke/smoke-test.sh
+```
+
+確認内容:
+
+- 各 CLI が PATH に存在すること（`full` では ffmpeg / imagemagick も）
+- Git LFS の filter が `/etc/gitconfig` にあり、root / node の双方から見えること
+- LFS 追跡ファイルがポインタとしてコミットされ、checkout で実体が復元されること
 
 ## ビルドターゲットの切替
 

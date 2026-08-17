@@ -133,6 +133,25 @@ Codex の設定、セッション、ログは主に `~/.codex` に保存され�
 
 つまり、`Dockerfile` はベース環境を用意し、実行時に変化する個人設定や CLI 状態は `entrypoint.sh` 側で収束させる、という責務分離です。
 
+## CI での継続的な確認
+
+ベースイメージを `:latest` で参照しているため、この構成はリポジトリ側を変更していなくても壊れることがあります。
+実際に Git LFS の欠落もこの形で表面化しました。upstream 側の変化に気づける仕組みがないと、同じ種類の事故が繰り返されます。
+
+そこで `.github/workflows/devcontainer.yml` で次を回しています。
+
+- `base` / `full` の両ターゲットをビルド
+- `scripts/smoke-test.sh` を **root と node の両方** で実行
+- push / PR に加えて週次でも実行（変更がなくても upstream の変化を検知するため）
+
+smoke test を 2 ユーザーで回しているのは、この構成の壊れ方が「root では動くが node では動かない」という形を取りやすいためです。
+LFS の filter を `--system` に入れている判断も、この観点で守られていないと意味がありません。
+
+確認内容はツールの存在確認だけでなく、LFS については実際に track → commit → checkout まで通し、ポインタ化と実体復元の両方を検証しています。
+`git lfs version` が通ることと、LFS が実際に機能することは別だからです。
+
+`config` ジョブでは `example.config.toml` から `config.toml` を生成した上で、`docker-compose.yml` と `devcontainer.json` が構成として妥当かを確認しています。
+
 ## 変更時に守りたいこと
 
 今後この構成を変更する場合は、少なくとも以下を崩さない方がよいです。
