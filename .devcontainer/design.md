@@ -46,6 +46,22 @@ README は使い方中心、こちらは判断理由と変更時の注意点を�
 - `.devcontainer-data/gh` -> `/home/node/.config/gh`
 - `.devcontainer-data/aws` -> `/home/node/.aws`
 
+## Git LFS
+
+ベースイメージには `git-lfs` が含まれていないため、LFS を使うリポジトリを clone / checkout すると、実体ではなくポインタファイルだけが手元に来ます。
+これは「ファイルは存在するのに中身が壊れている」ように見えるため、原因が分かりにくい種類の事故です。
+
+そのため `Dockerfile` の `base` ステージで `git-lfs` を導入し、続けて次を実行しています。
+
+```
+git lfs install --system --skip-repo
+```
+
+`--global` ではなく `--system` を選んでいるのは、書き込み先が `/etc/gitconfig` になり、`root`（entrypoint）と `node`（実作業）のどちらから git を叩いても LFS filter が有効になるためです。
+`--global` にすると実行ユーザーのホームにしか設定が入らず、ユーザーが変わった瞬間に smudge filter が効かなくなります。
+
+`--skip-repo` は、build 時にリポジトリ外で実行するため、リポジトリ側の hook 設定を試みないようにするためのものです。
+
 ## Codex / Claude の自己更新
 
 ### 問題

@@ -18,6 +18,7 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
 | ツール | 用途 |
 |--------|------|
 | GitHub CLI (`gh`) | GitHub 操作 |
+| Git LFS (`git lfs`) | 大容量ファイルを含むリポジトリの clone / checkout |
 | AWS CLI v2 | AWS リソース操作 |
 | dasel | TOML パーサ（entrypoint 用） |
 | Claude Code CLI | Anthropic AI コーディングアシスタント（初回起動時に writable な npm prefix へ自動導入） |
