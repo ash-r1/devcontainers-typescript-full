@@ -22,7 +22,7 @@ jobs:
       matrix:
         target: [base, full]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build ${{ matrix.target }} image
         run: docker build --target "${{ matrix.target }}" -t "devcontainer-smoke:${{ matrix.target }}" .devcontainer
@@ -48,7 +48,7 @@ jobs:
     name: config files
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # config.toml は gitignore されているのでテンプレートから作る
       - name: Create config.toml from template
