@@ -91,8 +91,8 @@ if [ -f "$CONFIG_FILE" ]; then
 
     # --global だと root のホームに入り、実作業ユーザーの node からは見えない。
     # LFS の filter と同じく /etc/gitconfig に置いて両方から見えるようにする。
-    git config --system user.name "$GIT_NAME"
-    git config --system user.email "$GIT_EMAIL"
+    git config --global user.name "$GIT_NAME"
+    git config --global user.email "$GIT_EMAIL"
     echo "[devcontainer] Git configured: $GIT_NAME <$GIT_EMAIL>"
 
     # ── Claude Code ──
@@ -108,7 +108,7 @@ if [ -f "$CONFIG_FILE" ]; then
     if [ -n "$GH_TOKEN" ]; then
         set_env "GITHUB_TOKEN" "$GH_TOKEN"
         # 認証状態の保存先は node の ~/.config/gh（永続化対象）なので node で実行する
-        echo "$GH_TOKEN" | run_as_node "gh auth login --with-token" 2>/dev/null \
+        echo "$GH_TOKEN" | gh auth login --with-token 2>/dev/null \
             && echo "[devcontainer] GitHub CLI authenticated" \
             || echo "[devcontainer] WARNING: gh auth login failed"
     fi
@@ -154,7 +154,7 @@ if [ -f "$CONFIG_FILE" ]; then
         echo "[devcontainer] Running post_start hook: $POST_START"
         # 実作業ユーザーで動かす。root で動かすと生成物が root 所有になり、
         # 後から node で触れなくなる
-        run_as_node "$POST_START" || echo "[devcontainer] WARNING: post_start hook failed"
+        bash -c "$POST_START" || echo "[devcontainer] WARNING: post_start hook failed"
     fi
 
 else
