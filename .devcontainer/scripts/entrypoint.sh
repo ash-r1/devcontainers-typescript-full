@@ -91,8 +91,8 @@ if [ -f "$CONFIG_FILE" ]; then
 
     # --global だと root のホームに入り、実作業ユーザーの node からは見えない。
     # LFS の filter と同じく /etc/gitconfig に置いて両方から見えるようにする。
-    git config --global user.name "$GIT_NAME"
-    git config --global user.email "$GIT_EMAIL"
+    git config --system user.name "$GIT_NAME"
+    git config --system user.email "$GIT_EMAIL"
     echo "[devcontainer] Git configured: $GIT_NAME <$GIT_EMAIL>"
 
     # ── Claude Code ──
