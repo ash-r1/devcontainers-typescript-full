@@ -133,30 +133,72 @@ Codex の設定、セッション、ログは主に `~/.codex` に保存され�
 
 つまり、`Dockerfile` はベース環境を用意し、実行時に変化する個人設定や CLI 状態は `entrypoint.sh` 側で収束させる、という責務分離です。
 
+## root と node の役割分担
+
+この構成では、entrypoint は **root** で動き、実作業は **node**（`remoteUser`）で行われます。
+ここを意識せずに設定を書くと、「entrypoint のログ上は成功しているのに、実際に使うユーザーからは何も見えない」という壊れ方をします。
+実際に次の 3 つが同じ原因で壊れていました。
+
+- `git config --global` が `/root/.gitconfig` に書かれ、node からは Git の名前・メールが見えない
+- `gh auth login` の結果が `/root/.config/gh` に入り、永続化対象の `/home/node/.config/gh` に残らない
+- `hooks.post_start` が root で実行され、生成物が root 所有になって後から node で触れない
+
+判断基準は「その設定が誰のものか」です。
+
+- **全ユーザー共通の設定** -> system スコープに置く（`/etc/gitconfig`、`/etc/profile.d/`）
+  - Git の LFS filter、Git のユーザー設定、環境変数がこれにあたります
+  - Git のユーザー設定を `--system` に置くのは一般には珍しいですが、この devcontainer は 1 人の開発者が root と node を行き来する前提なので、両方から同じ値が見えることを優先しています
+- **node のホーム配下に状態を作るもの** -> `run_as_node` を通して node で実行する
+  - `gh auth login`、`npm install -g`、`hooks.post_start` がこれにあたります
+
+`hooks.post_start` を node で実行するのは、VS Code の `postStartCommand` が `remoteUser` で動くことに合わせた挙動でもあります。
+root 権限が必要なフックを書く場合は、フック側で `sudo` を使ってください。
+
+## 起動完了の目印
+
+entrypoint はコンテナ起動と非同期に走り、CLI の導入まで含めると数十秒かかります。
+その間に接続すると、Git 設定も環境変数もまだ当たっていない状態を踏みます。
+
+そのため、すべての初期化が終わった時点で `/run/devcontainer-ready` を作ります。
+起動完了を待ちたい側（CI やスクリプト）はこれを見れば済み、個別の設定項目をポーリングする必要がありません。
+
 ## CI での継続的な確認
 
 ベースイメージを `:latest` で参照しているため、この構成はリポジトリ側を変更していなくても壊れることがあります。
 実際に Git LFS の欠落もこの形で表面化しました。upstream 側の変化に気づける仕組みがないと、同じ種類の事故が繰り返されます。
 
 そこで `.github/workflows/devcontainer.yml` で次を回しています。
+push / PR に加えて週次でも実行するのは、こちらを変更していなくても upstream の変化で壊れるためです。
 
-- `base` / `full` の両ターゲットをビルド
-- `scripts/smoke-test.sh` を **root と node の両方** で実行
-- push / PR に加えて週次でも実行（変更がなくても upstream の変化を検知するため）
+### `image` ジョブ: イメージに何が入っているか
 
-smoke test を 2 ユーザーで回しているのは、この構成の壊れ方が「root では動くが node では動かない」という形を取りやすいためです。
-LFS の filter を `--system` に入れている判断も、この観点で守られていないと意味がありません。
+`base` / `full` の両ターゲットをビルドし、`scripts/smoke-test.sh` を **root と node の両方** で実行します。
+2 ユーザーで回しているのは、この構成の壊れ方が「root では動くが node では動かない」形を取りやすいためです。
 
-確認内容はツールの存在確認だけでなく、LFS については実際に track → commit → checkout まで通し、ポインタ化と実体復元の両方を検証しています。
+確認はツールの存在確認だけでなく、LFS については実際に track -> commit -> checkout まで通し、ポインタ化と実体復元の両方を見ています。
 `git lfs version` が通ることと、LFS が実際に機能することは別だからです。
 
-`config` ジョブでは `example.config.toml` から `config.toml` を生成した上で、`docker-compose.yml` と `devcontainer.json` が構成として妥当かを確認しています。
+### `runtime` ジョブ: 起動後に期待した状態になっているか
+
+`devcontainer up` で実際にコンテナを起動し、`/run/devcontainer-ready` を待ってから `scripts/runtime-test.sh` を **`devcontainer exec` 経由（= remoteUser の node）** で実行します。
+イメージが正しくても entrypoint の適用先を間違えれば環境は壊れるので、こちらは「config.toml に書いた設定が node から見えるか」を確認します。
+
+- Git の名前・メールが config.toml の値と一致すること
+- API キーなどが login shell で参照できること、PATH に npm prefix が入っていること
+- 永続化対象ディレクトリが node で書き込めること、`~/.claude.json` が symlink であること
+- `claude` / `codex` がイメージ層ではなく書き込み可能な npm prefix にあること
+- `hooks.post_start` が root ではなく node で実行されること
+
+### `config` ジョブ: 設定ファイルが妥当か
+
+`example.config.toml` から `config.toml` を生成した上で、`docker-compose.yml` と `devcontainer.json` を検証します。
 
 ## 変更時に守りたいこと
 
 今後この構成を変更する場合は、少なくとも以下を崩さない方がよいです。
 
 - `node` ユーザーで CLI が実行・更新できること
+- entrypoint が適用する設定が、root ではなく `node` から見えること
 - 更新後の CLI 実体がコンテナ再作成後も残ること
 - Claude の `~/.claude` と `~/.claude.json` の両方が失われないこと
 - Codex の `~/.codex` が失われないこと

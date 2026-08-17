@@ -44,6 +44,80 @@ jobs:
             --entrypoint bash \
             "devcontainer-smoke:${{ matrix.target }}" /smoke/smoke-test.sh
 
+  runtime:
+    name: runtime state
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install devcontainer CLI
+        run: npm install -g @devcontainers/cli
+
+      # 実利用と同じ経路で設定が当たることを見たいので、CI 用の値を入れた
+      # config.toml を用意する（gitignore 済みなのでリポジトリには無い）
+      - name: Create config.toml
+        run: |
+          cat > .devcontainer/config.toml <<'TOML'
+          [git]
+          name = "Devcontainer CI"
+          email = "devcontainer-ci@example.invalid"
+
+          [claude]
+          api_key = "dummy-anthropic-key"
+
+          [codex]
+          api_key = "dummy-openai-key"
+
+          [hooks]
+          post_start = "id -un > /tmp/post-start-user"
+          TOML
+
+      - name: Start devcontainer
+        run: |
+          set -o pipefail
+          devcontainer up --workspace-folder . > up.json 2> up.log || { cat up.log; exit 1; }
+          container_id=$(jq -rs '.[-1].containerId // empty' up.json 2>/dev/null || true)
+          if [ -z "$container_id" ]; then
+            container_id=$(docker ps --filter "label=devcontainer.local_folder=$PWD" --format '{{.ID}}' | head -n 1)
+          fi
+          if [ -z "$container_id" ]; then
+            cat up.json up.log
+            echo "could not determine the container id" >&2
+            exit 1
+          fi
+          echo "CONTAINER_ID=$container_id" >> "$GITHUB_ENV"
+
+      # entrypoint は起動と非同期に走るので、完了してから状態を見る
+      - name: Wait for the entrypoint to finish
+        run: |
+          for _ in $(seq 1 60); do
+            if docker exec "$CONTAINER_ID" test -f /run/devcontainer-ready; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "the entrypoint did not finish within 5 minutes" >&2
+          docker logs "$CONTAINER_ID"
+          exit 1
+
+      - name: Verify runtime state as the remote user
+        run: devcontainer exec --workspace-folder . bash .devcontainer/scripts/runtime-test.sh
+
+      - name: Verify image contents as the remote user
+        run: devcontainer exec --workspace-folder . bash .devcontainer/scripts/smoke-test.sh
+
+      - name: Verify the post_start hook runs as the remote user
+        run: |
+          actual=$(docker exec "$CONTAINER_ID" cat /tmp/post-start-user)
+          [ "$actual" = "node" ] || {
+            echo "post_start ran as '$actual', expected 'node'" >&2
+            exit 1
+          }
+
+      - name: Container logs
+        if: always()
+        run: docker logs "$CONTAINER_ID" || true
+
   config:
     name: config files
     runs-on: ubuntu-latest

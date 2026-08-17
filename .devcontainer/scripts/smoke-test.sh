@@ -13,6 +13,9 @@ FAILURES=0
 
 SMOKE_TMP=$(mktemp -d)
 trap 'rm -rf "$SMOKE_TMP"' EXIT
+# git の確認をするので、別 uid が持つリポジトリの中では動かさない
+# （所有者チェックに引っかかって、見たいものが見えなくなる）
+cd "$SMOKE_TMP" || exit 1
 
 # ── Helper: run a check, print its output only when it fails ──
 check() {
