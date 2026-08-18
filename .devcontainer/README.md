@@ -18,6 +18,7 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
 | ツール | 用途 |
 |--------|------|
 | GitHub CLI (`gh`) | GitHub 操作 |
+| Git LFS (`git lfs`) | 大容量ファイルを含むリポジトリの clone / checkout |
 | AWS CLI v2 | AWS リソース操作 |
 | dasel | TOML パーサ（entrypoint 用） |
 | Claude Code CLI | Anthropic AI コーディングアシスタント（初回起動時に writable な npm prefix へ自動導入） |
@@ -50,6 +51,8 @@ TypeScript フルスタック開発用の汎用 devcontainer テンプレート�
   example.config.toml               # 設定テンプレート（コピーして使用）
   scripts/
     entrypoint.sh                   # コンテナ起動時に TOML 設定を読み込み環境を構成
+    smoke-test.sh                   # ビルド済みイメージの動作確認（CI から実行）
+    runtime-test.sh                 # 起動後の状態確認（CI から remoteUser で実行）
 .devcontainer-data/                 # host 側に残る CLI の設定・履歴・ログ・npm グローバル領域
 ```
 
@@ -104,6 +107,55 @@ devcontainer build
 ## DB サイドカーの有効化
 
 `docker-compose.yml` 内の MySQL / PostgreSQL セクションのコメントを解除してください。DB には Unix ソケット経由で接続します（TCP ポートのホスト公開不要）。
+
+## 動作確認
+
+`.github/workflows/devcontainer.yml` が push / PR / 週次で以下を確認します。
+
+| ジョブ | 内容 |
+|--------|------|
+| `image` | `base` / `full` をビルドし、`smoke-test.sh` を root と node の両方で実行 |
+| `runtime` | `devcontainer up` で起動し、`runtime-test.sh` を remoteUser (node) で実行 |
+| `config` | `docker-compose.yml` と `devcontainer.json` を検証 |
+
+### イメージの確認 (smoke-test.sh)
+
+手元で同じ確認をする場合:
+
+```bash
+docker build --target full -t devcontainer-smoke:full .devcontainer
+
+docker run --rm -e SMOKE_TARGET=full \
+  -v "$PWD/.devcontainer/scripts:/smoke:ro" \
+  --entrypoint bash devcontainer-smoke:full /smoke/smoke-test.sh
+
+# 実作業ユーザーでも同じ結果になること
+docker run --rm --user node -e HOME=/home/node -e SMOKE_TARGET=full \
+  -v "$PWD/.devcontainer/scripts:/smoke:ro" \
+  --entrypoint bash devcontainer-smoke:full /smoke/smoke-test.sh
+```
+
+確認内容:
+
+- 各 CLI が PATH に存在すること（`full` では ffmpeg / imagemagick も）
+- Git LFS の filter が `/etc/gitconfig` にあり、root / node の双方から見えること
+- LFS 追跡ファイルがポインタとしてコミットされ、checkout で実体が復元されること
+
+### 起動後の状態の確認 (runtime-test.sh)
+
+`config.toml` に書いた設定が、実際に作業するユーザー (`node`) から見えているかを確認します。
+entrypoint は root で動くため、ここがズレると「ログ上は成功しているのに設定が効かない」状態になります。
+
+```bash
+devcontainer up --workspace-folder .
+devcontainer exec --workspace-folder . bash .devcontainer/scripts/runtime-test.sh
+```
+
+entrypoint は起動と非同期に走るので、初期化の完了は `/run/devcontainer-ready` の有無で判断できます。
+
+```bash
+devcontainer exec --workspace-folder . bash -c 'test -f /run/devcontainer-ready && echo ready'
+```
 
 ## ビルドターゲットの切替
 

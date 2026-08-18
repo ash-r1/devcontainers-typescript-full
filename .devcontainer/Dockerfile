@@ -12,11 +12,15 @@ RUN apt-get update \
         default-mysql-client \
         postgresql-client \
         redis-tools \
+        git-lfs \
         curl \
         unzip \
         gnupg \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Git LFS filters in /etc/gitconfig so every user (incl. node) gets them
+RUN git lfs install --system --skip-repo
 
 # GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
